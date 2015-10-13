@@ -71,7 +71,7 @@ class GeneticPendulum:
         if i % self.plot_interval == 0:
             init = self.initial_conditions()
             sim = self.simulate(pop[0], init)
-            with open('/tmp/last-run-%d.csv' % i, 'w') as f:
+            with open('last-run-%d.csv' % i, 'w') as f:
                 writer = csv.DictWriter(f, sim[0].keys())
                 writer.writeheader()
                 writer.writerows(sim)

@@ -89,12 +89,15 @@ class Animate:
 
 @click.command()
 @click.argument('input-run', type=click.File('r'))
-@click.option('--rod-length', type=click.FLOAT, help='Length of the rod (m)')
-@click.option('--delta-t', type=click.FLOAT, help='Simulation delta t (ms)')
-@click.option('--gif-name', type=click.STRING, help='Where to save the GIF animation')
+@click.option('--rod-length', default=0.5, help='Length of the rod (m)')
+@click.option('--delta-t', default=20, help='Simulation delta t (ms)')
+@click.option('--gif-name', type=click.STRING,
+              help='If specified, save a GIF with this filename')
 @click.option('--gif-fps', type=click.INT, default=24)
-@click.option('--width', type=click.FLOAT, default=5.)
-@click.option('--height', type=click.FLOAT, default=8.)
+@click.option('--width', type=click.FLOAT, default=8.,
+              help='Width of the animation (inches)')
+@click.option('--height', type=click.FLOAT, default=8.,
+              help='Height of the animation (inches)')
 @click.option('--dpi', type=click.FLOAT, default=96.)
 @click.option('--blit/--no-blit', default=True)
 def main(input_run, rod_length, delta_t, gif_name, gif_fps, width, height, dpi, blit):
