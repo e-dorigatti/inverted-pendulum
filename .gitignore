@@ -1,0 +1,6 @@
+*.pyc
+*.pyo
+*.swp
+*.gif
+*.png
+py_neuralnet
