@@ -114,8 +114,8 @@ class GeneticPendulum:
         plt.show()
 
 
-if __name__ == '__main__':
-    gp = GeneticPendulum()
+def parse_args(cls):
+    gp = cls()
     for arg in sys.argv[1:]:
         name, val = arg.split('=', 1)
         orig = getattr(gp, name)
@@ -130,4 +130,9 @@ if __name__ == '__main__':
             value = type(orig)(val)
         setattr(gp, name, value)
 
+    return gp
+
+
+if __name__ == '__main__':
+    gp = parse_args(GeneticPendulum)
     gp.learn()
