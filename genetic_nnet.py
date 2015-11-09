@@ -61,21 +61,30 @@ class GeneticPendulum:
 
         return data
 
+    def checkpoint(self, i, pop):
+        init = self.initial_conditions()
+        sim = self.simulate(pop[0], init)
+        with open('last-run-%d.csv' % i, 'w') as f:
+            writer = csv.DictWriter(f, sim[0].keys())
+            writer.writeheader()
+            writer.writerows(sim)
+        Animate(sim, init.l, 2 * init.dt * 1000, tight_layout=True).show()
+
     def evaluate(self, nnet, sim=None):
         sim = sim or self.simulate(nnet, self.initial_conditions())
-        return (-sum(abs(self.target['theta'] - p['theta']) * p['t'] for p in sim)
-                -sum(abs(self.target['x'] - p['x']) * p['t'] for p in sim)
-                -sum((w**2).sum() for w in nnet.weights) * self.regularization_coeff)
+
+        fitness = -sum((w**2).sum() for w in nnet.weights) * self.regularization_coeff
+        if 'theta' in self.target:
+            fitness -= sum(abs(self.target['theta'] - p['theta']) * p['t'] for p in sim)
+
+        if 'x' in self.target:
+            fitness -= sum(abs(self.target['x'] - p['x']) for p in sim) * 0.05
+
+        return fitness
 
     def stop(self, i, pop):
         if i % self.plot_interval == 0:
-            init = self.initial_conditions()
-            sim = self.simulate(pop[0], init)
-            with open('last-run-%d.csv' % i, 'w') as f:
-                writer = csv.DictWriter(f, sim[0].keys())
-                writer.writeheader()
-                writer.writerows(sim)
-            Animate(sim, init.l, 2 * init.dt * 1000, tight_layout=True).show()
+            self.checkpoint(i, pop)
 
         best_worst = [self.evaluate(n) for n in pop[:2] + pop[-2:]]
         self.gen_history.append((i, best_worst[0], best_worst[-1]))
@@ -108,17 +117,17 @@ class GeneticPendulum:
 if __name__ == '__main__':
     gp = GeneticPendulum()
     for arg in sys.argv[1:]:
-        name, value = arg.split('=', 1)
+        name, val = arg.split('=', 1)
         orig = getattr(gp, name)
         if type(orig) == list:  # lists must have homogenuous type
-            value = [type(orig[0])(e) for e in value.split(',')]
+            value = [type(orig[0])(e) for e in val.split(',')]
         elif type(orig) == dict:
-            for kvp in value.split(';'):
+            value = {}
+            for kvp in val.split(';'):
                 k, v = kvp.split(':', 1)
                 orig[k] = type(orig[k])(v)
-            value = orig
         else:
-            value = type(orig)(value)
+            value = type(orig)(val)
         setattr(gp, name, value)
 
     gp.learn()
