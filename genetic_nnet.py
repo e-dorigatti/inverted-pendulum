@@ -3,6 +3,7 @@ from simulate import PendulumDynamics
 from animate import Animate
 import numpy as np
 import matplotlib.pyplot as plt
+import pickle
 import itertools
 import sys
 import csv
@@ -10,6 +11,7 @@ import csv
 
 class GeneticPendulum:
     nnet_size = [5, 5, 1]           # nnet arch (must start with 5 and end with 1)
+    nnet_activation = 'tanh'        # activation function used by nnet
     pop_size = 20                   # n neural networks compete (learning is O(n**2))
     force_factor = 50.              # multiply nnet output (-1 to 1) by this factor
     time_limit = 2.5                # duration of the simulation in seconds (O(n**2))
@@ -27,7 +29,7 @@ class GeneticPendulum:
 
     def learn(self):
         genetic_learn(self.nnet_size, self.pop_size, self.evaluate, self.stop,
-                      activation='tanh')
+                      activation=self.nnet_activation)
 
     def initial_conditions(self):
         p = PendulumDynamics(**self.pendulum_init)
@@ -45,7 +47,7 @@ class GeneticPendulum:
                                     pd.xdot,
                                     pd.theta,
                                     pd.thetadot,
-                                    t * pd.dt
+                                    t * pd.dt / self.time_limit,
                                     ])[0][0]
 
             data.append({
@@ -68,17 +70,18 @@ class GeneticPendulum:
             writer = csv.DictWriter(f, sim[0].keys())
             writer.writeheader()
             writer.writerows(sim)
+
+        with open('last-run-%d.pickle' % i, 'w') as f:
+            pickle.dump(pop[0], f)
+
         Animate(sim, init.l, 2 * init.dt * 1000, tight_layout=True).show()
 
     def evaluate(self, nnet, sim=None):
         sim = sim or self.simulate(nnet, self.initial_conditions())
 
         fitness = -sum((w**2).sum() for w in nnet.weights) * self.regularization_coeff
-        if 'theta' in self.target:
-            fitness -= sum(abs(self.target['theta'] - p['theta']) * p['t'] for p in sim)
-
-        if 'x' in self.target:
-            fitness -= sum(abs(self.target['x'] - p['x']) for p in sim) * 0.05
+        for k in self.target:
+            fitness -= sum(p['t'] * (self.target[k] - p[k])**2 for p in sim)
 
         return fitness
 
@@ -114,8 +117,7 @@ class GeneticPendulum:
         plt.show()
 
 
-def parse_args(cls):
-    gp = cls()
+def parse_args(gp):
     for arg in sys.argv[1:]:
         name, val = arg.split('=', 1)
         orig = getattr(gp, name)
@@ -129,10 +131,9 @@ def parse_args(cls):
         else:
             value = type(orig)(val)
         setattr(gp, name, value)
-
     return gp
 
 
 if __name__ == '__main__':
-    gp = parse_args(GeneticPendulum)
+    gp = parse_args(GeneticPendulum())
     gp.learn()
