@@ -13,6 +13,7 @@ class GeneticPendulum(GeneticAlgorithm):
     nnet_size = [5, 5, 1]                 # nnet arch (must start with 5 and end with 1)
     nnet_activation = 'tanh'              # activation function used by nnet
     pop_size = 20                         # n neural networks compete (learning is O(n**2))
+    pop_dump = ''                         # initial population dump
     force_factor = 50.                    # multiply nnet output (-1 to 1) by this factor
     time_limit = 2.5                      # duration of the simulation in seconds (O(n**2))
     checkpoint_interval = 20              # checkpoint, dump population and show plots
@@ -110,6 +111,13 @@ class GeneticPendulum(GeneticAlgorithm):
 
     def get_new_neural_network(self, size):
         return NeuralNetwork(size, activation=self.nnet_activation)
+
+    def initial_population(self, nnet_size, pop_size):
+        if self.pop_dump:
+            with open(self.pop_dump) as f:
+                return pickle.load(f)
+        else:
+            return [self.get_new_neural_network(nnet_size) for _ in range(pop_size)]
 
     def plot(self, best):
         time = [x['t'] for x in best]
