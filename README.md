@@ -12,7 +12,7 @@ dictionary split key value pairs with semicolon and split key from value with co
 for example`target=x:0;y:0`. For boolean false use the empty string as any other string
 is interpreted as boolean true.
 
-Every `checkpoint_interval` generations the script [dumps](genetic_nnet.py#L16) the
+Every `checkpoint_interval` generations the script [dumps](genetic_nnet.py#L68) the
 current population and a csv with a sample trial originating from the best performing
 neural network found so far, and displays an animation of it, too!
 You can see some samples [here](samples/) and animate them with the [animate.py](animate.py)

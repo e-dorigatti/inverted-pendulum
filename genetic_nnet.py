@@ -1,4 +1,4 @@
-from py_neuralnet import NeuralNetwork, genetic_learn
+from py_neuralnet import NeuralNetwork, genetic_learn, GeneticAlgorithm
 from simulate import PendulumDynamics
 from animate import Animate
 import numpy as np
@@ -9,20 +9,21 @@ import sys
 import csv
 
 
-class GeneticPendulum:
-    nnet_size = [5, 5, 1]           # nnet arch (must start with 5 and end with 1)
-    nnet_activation = 'tanh'        # activation function used by nnet
-    pop_size = 20                   # n neural networks compete (learning is O(n**2))
-    force_factor = 50.              # multiply nnet output (-1 to 1) by this factor
-    time_limit = 2.5                # duration of the simulation in seconds (O(n**2))
-    checkpoint_interval = 20        # checkpoint, dump population and show plots
-    checkpoint_animation = True     # show animation at checkpoint (blocking!)
-    checkpoint_summary = False      # simple summary plots at checkpoint (blocking!)
-    weight_noise_stdev = 0.0002     # apply gaussian noise of given stdev to weights
-    weight_noise_worst = 10         # apply weight noise to the worst n nnets
-    regularization_coeff = 1.       # prefer nnets with low weights
-    nnet_control_interval = 1       # allow the nnet to apply force every n steps
-    target = dict(x=0., theta=0.)   # the nnet should keep the pendulum close to this
+class GeneticPendulum(GeneticAlgorithm):
+    nnet_size = [5, 5, 1]                 # nnet arch (must start with 5 and end with 1)
+    nnet_activation = 'tanh'              # activation function used by nnet
+    pop_size = 20                         # n neural networks compete (learning is O(n**2))
+    force_factor = 50.                    # multiply nnet output (-1 to 1) by this factor
+    time_limit = 2.5                      # duration of the simulation in seconds (O(n**2))
+    checkpoint_interval = 20              # checkpoint, dump population and show plots
+    checkpoint_animation = True           # show animation at checkpoint (blocking!)
+    checkpoint_summary = False            # simple summary plots at checkpoint (blocking!)
+    weight_noise_stdev = 0.0002           # apply gaussian noise of given stdev to weights
+    weight_noise_worst = 10               # apply weight noise to the worst n nnets
+    regularization_coeff = 1.             # prefer nnets with low weights
+    nnet_control_interval = 1             # allow the nnet to apply force every n steps
+    target = dict(x=0., theta=0.)         # the nnet should keep the pendulum close to this
+    target_weights = dict(x=.5, theta=.5) # weights for the multi-objective optimization
     pendulum_init = dict(x=0., xdot=0., theta=np.pi, thetadot=0.)
     pendulum_phys = dict(m=0.1, M=1.0, l=1.0, g=9.81, b=2.0, dt=0.02)
 
@@ -30,8 +31,7 @@ class GeneticPendulum:
         self.gen_history = []
 
     def learn(self):
-        genetic_learn(self.nnet_size, self.pop_size, self.evaluate, self.stop,
-                      activation=self.nnet_activation)
+        genetic_learn(self, self.nnet_size, self.pop_size)
 
     def initial_conditions(self):
         p = PendulumDynamics(**self.pendulum_init)
@@ -83,12 +83,13 @@ class GeneticPendulum:
         if self.checkpoint_summary:
             self.plot(sim)
 
-    def evaluate(self, nnet, sim=None):
+    def fitness(self, nnet, sim=None):
         sim = sim or self.simulate(nnet, self.initial_conditions())
 
         fitness = -sum((w**2).sum() for w in nnet.weights) * self.regularization_coeff
         for k in self.target:
-            fitness -= sum((self.target[k] - p[k])**2 for p in sim)
+            weight = self.target_weights.get(k, 1.)
+            fitness -= weight * sum((self.target[k] - p[k])**2 for p in sim)
 
         return fitness
 
@@ -96,7 +97,7 @@ class GeneticPendulum:
         if i % self.checkpoint_interval == 0:
             self.checkpoint(i, pop)
 
-        best_worst = [self.evaluate(n) for n in pop[:2] + pop[-2:]]
+        best_worst = [self.fitness(n) for n in pop[:2] + pop[-2:]]
         self.gen_history.append((i, best_worst[0], best_worst[-1]))
         print i, '    '.join(str(x) for x in best_worst)
 
@@ -106,6 +107,9 @@ class GeneticPendulum:
                     w += np.random.normal(0, self.weight_noise_stdev, w.shape)
 
         return False
+
+    def get_new_neural_network(self, size):
+        return NeuralNetwork(size, activation=self.nnet_activation)
 
     def plot(self, best):
         time = [x['t'] for x in best]
