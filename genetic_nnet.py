@@ -115,7 +115,11 @@ class GeneticPendulum(GeneticAlgorithm):
     def initial_population(self, nnet_size, pop_size):
         if self.pop_dump:
             with open(self.pop_dump) as f:
-                return pickle.load(f)
+                population = pickle.load(f)
+
+            population.extend(self.get_new_neural_network(nnet_size)
+                              for _ in range(pop_size - len(population)))
+            return population
         else:
             return [self.get_new_neural_network(nnet_size) for _ in range(pop_size)]
 

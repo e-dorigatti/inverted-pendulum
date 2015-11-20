@@ -22,4 +22,12 @@ script; if you really like what you see you can also create a GIF animation from
 
 There is also a parallel implementation of the algorithm which uses
 [Apache Spark](http://spark.apache.org/); to run it download spark and use the included
-`spark-submit` script to launch [spark_learn.py](spark_learn.py).
+`spark-submit` script to launch [spark_learn.py](spark_learn.py). If you need a
+deployment more complex than local mode you will probably need to specify a couple of
+parameters, at the very least `master`, `py-files` and `num_slices` (for better
+parallelization, depends on CPU count and population size). For example:
+
+```
+find . -name '*.py' | xargs zip /tmp/genetic.zip
+/path/to/spark/bin/spark-submit --master spark://somewhere:7077 --py-files /tmp/genetic.zip spark_learn.py num_slices=24
+```
