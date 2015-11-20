@@ -29,5 +29,7 @@ parallelization, depends on CPU count and population size). For example:
 
 ```
 find . -name '*.py' | xargs zip /tmp/genetic.zip
-/path/to/spark/bin/spark-submit --master spark://somewhere:7077 --py-files /tmp/genetic.zip spark_learn.py num_slices=24
+/path/to/spark/bin/spark-submit --master spark://somewhere:7077 \
+                                --py-files /tmp/genetic.zip \
+                                spark_learn.py num_slices=24
 ```
