@@ -19,6 +19,7 @@ class GeneticPendulum(GeneticAlgorithm):
     checkpoint_interval = 20              # checkpoint, dump population and show plots
     checkpoint_animation = True           # show animation at checkpoint (blocking!)
     checkpoint_summary = False            # simple summary plots at checkpoint (blocking!)
+    checkpoint_basename = 'last-run-%d'   # base name for checkpoint dump (csv and pickle)
     weight_noise_stdev = 0.0002           # apply gaussian noise of given stdev to weights
     weight_noise_worst = 10               # apply weight noise to the worst n nnets
     regularization_coeff = 1.             # prefer nnets with low weights
@@ -70,12 +71,13 @@ class GeneticPendulum(GeneticAlgorithm):
         init = self.initial_conditions()
         sim = self.simulate(pop[0], init)
 
-        with open('last-run-%d.csv' % i, 'w') as f:
+        basename = self.checkpoint_basename.format(i)
+        with open(basename + '.csv', 'w') as f:
             writer = csv.DictWriter(f, sim[0].keys())
             writer.writeheader()
             writer.writerows(sim)
 
-        with open('last-run-%d.pickle' % i, 'w') as f:
+        with open(basename + '.pickle', 'w') as f:
             pickle.dump(pop, f)
 
         if self.checkpoint_animation:
