@@ -1,4 +1,5 @@
-from py_neuralnet import NeuralNetwork, genetic_learn, GeneticAlgorithm
+from __future__ import print_function
+from py_neuralnet import NeuralNetwork, GeneticAlgorithm, genetic_learn
 from simulate import PendulumDynamics
 from animate import Animate
 import numpy as np
@@ -19,7 +20,7 @@ class GeneticPendulum(GeneticAlgorithm):
     checkpoint_interval = 20              # checkpoint, dump population and show plots
     checkpoint_animation = True           # show animation at checkpoint (blocking!)
     checkpoint_summary = False            # simple summary plots at checkpoint (blocking!)
-    checkpoint_basename = 'last-run-%d'   # base name for checkpoint dump (csv and pickle)
+    checkpoint_basename = 'last-run-{}'   # base name for checkpoint dump (csv and pickle)
     weight_noise_stdev = 0.0002           # apply gaussian noise of given stdev to weights
     weight_noise_worst = 10               # apply weight noise to the worst n nnets
     regularization_coeff = 1.             # prefer nnets with low weights
@@ -37,7 +38,7 @@ class GeneticPendulum(GeneticAlgorithm):
 
     def initial_conditions(self):
         p = PendulumDynamics(**self.pendulum_init)
-        for k, v in self.pendulum_phys.iteritems():
+        for k, v in self.pendulum_phys.items():
             setattr(p, k, v)
         return p
 
@@ -77,7 +78,7 @@ class GeneticPendulum(GeneticAlgorithm):
             writer.writeheader()
             writer.writerows(sim)
 
-        with open(basename + '.pickle', 'w') as f:
+        with open(basename + '.pickle', 'wb') as f:
             pickle.dump(pop, f)
 
         if self.checkpoint_animation:
@@ -90,6 +91,8 @@ class GeneticPendulum(GeneticAlgorithm):
         sim = sim or self.simulate(nnet, self.initial_conditions())
 
         fitness = -sum((w**2).sum() for w in nnet.weights) * self.regularization_coeff
+        fitness -= sum(p['force'] for p in sim)
+
         for k in self.target:
             weight = self.target_weights.get(k, 1.)
             fitness -= weight * sum((self.target[k] - p[k])**2 for p in sim)
@@ -102,7 +105,7 @@ class GeneticPendulum(GeneticAlgorithm):
 
         best_worst = [self.fitness(n) for n in pop[:2] + pop[-2:]]
         self.gen_history.append((i, best_worst[0], best_worst[-1]))
-        print i, '    '.join(str(x) for x in best_worst)
+        print(i, '    '.join(str(x) for x in best_worst))
 
         if self.weight_noise_stdev > 0:
             for nnet in pop[self.weight_noise_worst:]:
@@ -116,7 +119,7 @@ class GeneticPendulum(GeneticAlgorithm):
 
     def initial_population(self, nnet_size, pop_size):
         if self.pop_dump:
-            with open(self.pop_dump) as f:
+            with open(self.pop_dump, 'rb') as f:
                 population = pickle.load(f)
 
             population.extend(self.get_new_neural_network(nnet_size)
@@ -153,6 +156,7 @@ def parse_args(gp):
             for kvp in val.split(';'):
                 k, v = kvp.split(':', 1)
                 orig[k] = type(orig[k])(v)
+            value = orig
         else:
             value = type(orig)(val)
         setattr(gp, name, value)

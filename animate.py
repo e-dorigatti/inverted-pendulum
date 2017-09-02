@@ -1,3 +1,4 @@
+from __future__ import print_function
 import click
 import csv
 import numpy as np
@@ -14,7 +15,7 @@ class Animate:
 
         self.data = defaultdict(list)
         for point in data_points:
-            for k, v in point.iteritems():
+            for k, v in point.items():
                 self.data[k].append(float(v))
 
         self.fig = plt.figure(**fig_kwargs)
@@ -106,10 +107,10 @@ def main(input_run, rod_length, delta_t, gif_name, gif_fps, width, height, dpi, 
                    figsize=(width, height))
 
     if gif_name and gif_fps:
-        print 'Saving as animated gif'
+        print('Saving as animated gif')
         anim.animation.save(gif_name, writer='imagemagick', fps=gif_fps)
     else:
-        print 'Showing animation'
+        print('Showing animation')
         anim.show()
 
 if __name__ == '__main__':

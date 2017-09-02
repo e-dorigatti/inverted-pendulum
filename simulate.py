@@ -1,3 +1,4 @@
+from __future__ import print_function
 from math import sin, cos, pi
 import matplotlib.pyplot as plt
 
@@ -33,6 +34,10 @@ class PendulumDynamics:
         self.thetadot = self.thetadot + theta_acc * self.dt
         self.theta = self.theta + self.thetadot * self.dt
 
+    @property
+    def state(self):
+        return self.x, self.xdot, self.theta, self.thetadot
+
 
 def to_deg(rad):
     return rad*180/pi
@@ -61,7 +66,7 @@ def plot(time, positions, angles):
 
 
 def drop_test():
-    print 'simple drop test, do the plots look realistic?'
+    print('simple drop test, do the plots look realistic?')
 
     cart = PendulumDynamics(0, 0, 0.05, 0)
 
@@ -77,7 +82,7 @@ def drop_test():
 
 
 def balance_test():
-    print 'trying to balance the thing...'
+    print('trying to balance the thing...')
 
     cart = PendulumDynamics(0, 0, 0.05, 0)
 
