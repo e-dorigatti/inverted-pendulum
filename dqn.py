@@ -1,4 +1,5 @@
 import numpy as np
+import pickle
 import os
 import tensorflow as tf
 from tensorflow.examples.tutorials.mnist import input_data
@@ -7,7 +8,7 @@ import random
 from simulate import PendulumDynamics
 
 
-class ReplayBuffer:
+class KMostRecent:
     def __init__(self, max_size):
         self.max_size = max_size
         self.buffer = deque()
@@ -28,8 +29,8 @@ class ReplayBuffer:
 
 
 class StatusProcessor:
-    x_min = -10
-    x_max = 10
+    x_min = -25
+    x_max = 25
     xdot_min = -100
     xdot_max = 100
     theta_min = -10
@@ -66,23 +67,32 @@ class StatusProcessor:
         return all(-1 <= x <= 1 for x in status)
 
 
+def remove_nan(x, o):
+    return o if np.isnan(x) else x
+
+
 def main():
-    # network shape
-    nnet_state_size = 4
-    nnet_action_size = 3
-    nnet_hidden_state_size = 16
-    nnet_hidden_size = 8
 
     # learning hyper parameters
-    tau = 0.1
+    tau = 0.001
     replay_batch_size = 32
     simulation_length = 500
     num_episodes = 100000
-    replay_buffer_size = 0.1 * num_episodes * simulation_length
-    force_factor = 50
-    epsilon_decay = 0.0005
-    gamma = 0.9
+    replay_buffer_size = 1000000
+    force_factor = 75
+    epsilon_decay = 0.00025
+    min_eps = 0.1
+    gamma = 0.99
     save_network_every = 25
+    learning_rate = 0.001
+    regularization_coeff = 0.001
+    past_states_count = 4
+
+    # network shape
+    nnet_state_size = 4 * past_states_count
+    nnet_action_size = 3
+    nnet_hidden_state_size = 128
+    nnet_hidden_size = 128
 
     graph = tf.Graph()
     with graph.as_default():
@@ -122,9 +132,15 @@ def main():
         output = compute_next_layer(hidden_combined, weights_4, bias_4, activation=None)
 
         squared_error = (nnet_label - output)**2
-        loss = tf.reduce_mean(squared_error)
+        loss = tf.reduce_mean(squared_error) + regularization_coeff * (
+            tf.reduce_sum(weights_1 ** 2) + tf.reduce_sum(bias_1 ** 2) +
+            tf.reduce_sum(weights_2 ** 2) + tf.reduce_sum(bias_2 ** 2) + 
+            tf.reduce_sum(weights_3 ** 2) + tf.reduce_sum(bias_3 ** 2) + 
+            tf.reduce_sum(weights_4 ** 2) + tf.reduce_sum(bias_4 ** 2) + 
+            tf.reduce_sum(bias_5 ** 2)
+        )
 
-        optimizer = tf.train.AdamOptimizer(0.001).minimize(loss)
+        optimizer = tf.train.AdamOptimizer(learning_rate).minimize(loss)
 
         network_params = [weights_1, bias_1, weights_2,
                           bias_2, weights_3, bias_3,
@@ -156,28 +172,21 @@ def main():
 
         writer = tf.summary.FileWriter('logs', session.graph)
         saver = tf.train.Saver(network_params)
-        replay_buffer = ReplayBuffer(replay_buffer_size)
+        replay_buffer = KMostRecent(replay_buffer_size)
         state_processor = StatusProcessor()
 
         for episode in range(num_episodes):
             pendulum = PendulumDynamics(0, 0, np.pi, 0)
+            last_states = KMostRecent(past_states_count)
+            for _ in range(past_states_count):
+                last_states.add(state_processor.normalize(pendulum.state))
 
-            if episode and not episode % save_network_every:
-                # TODO save framebuffer's contents as well!
-                saver.save(session, './logs/updates', global_step=episode)
-                with open('./logs/last.csv', 'w') as f:
-                    f.write('x;xdot;theta;thetadot\n')
-                    for state in last_episode:
-                        f.write('%f;%f;%f;%f\n' % state)
-                print('saved')
-
-            end_early, last_episode, all_losses, all_rewards = False, [], [], []
+            end_early, last_episode, all_losses, all_rewards, all_qs = False, [], [], [], []
             for step in range(simulation_length):
-                state = state_processor.normalize(pendulum.state)
-                last_episode.append(state)
+                state = [x for s in last_states.buffer for x in s]
 
                 # choose next action
-                if np.random.random() < np.exp(-episode * epsilon_decay):
+                if np.random.random() < max(min_eps, np.exp(-episode * epsilon_decay)):
                     action = random.choice([-1, 0, 1])
                 else:
                     q_vals = session.run(output, feed_dict={
@@ -188,24 +197,29 @@ def main():
                     })
                     if q_vals[0][0] >= q_vals[1][0] and q_vals[0][0] >= q_vals[2][0]:
                         action = -1
+                        all_qs.append(q_vals[0][0])
                     elif q_vals[1][0] >= q_vals[0][0] and q_vals[1][0] >= q_vals[2][0]:
                         action = 0
+                        all_qs.append(q_vals[1][0])
                     else:  # if q_vals[2][0] >= q_vals[1][0] and q_vals[2][0] >= q_vals[0][0]:
                         action = 1
+                        all_qs.append(q_vals[2][0])
 
                 # perform action
+                last_episode.append((state, action))
                 old_state = state
                 pendulum.step_simulate(force_factor * action)
-                state = state_processor.normalize(pendulum.state)
+                last_states.add(state_processor.normalize(pendulum.state))
+                state = [x for s in last_states.buffer for x in s]
 
-                if state_processor.is_valid_norm(state):
-                    #reward = -0.05 * (abs(pendulum.theta) - 1) - 0.005 * (abs(pendulum.x) - 1)
-                    reward = 0.1 if abs(pendulum.theta) < 0.25 and abs(pendulum.x < 0.25) else -0.001
+                if state_processor.is_valid(pendulum.state):
+                    reward = -0.05 * (abs(pendulum.theta) - 3) - 0.001 * (abs(pendulum.x) - 3)
+                    #reward = 0.1 if abs(pendulum.theta) < 0.25 and abs(pendulum.x < 0.25) else -0.001
                 else:
-                    reward = -1
+                    reward = -10
                     end_early = True
 
-                replay_buffer.add((old_state, action, reward, state))
+                replay_buffer.add((old_state, action, reward, state, end_early))
                 all_rewards.append(reward)
 
                 if end_early:
@@ -215,7 +229,7 @@ def main():
 
                 # get q value for each action in the batch
                 next_moves_q_state, next_moves_q_action = [], []
-                for state, action, reward, next_state in batch_replay:
+                for state, action, reward, next_state, end in batch_replay:
                     next_moves_q_state.extend([next_state] * 3)
                     next_moves_q_action.extend([
                         [1, 0, 0], [0, 1, 0], [0, 0, 1]
@@ -228,13 +242,13 @@ def main():
 
                 # compute expected reward for the states in the batch
                 batch_inputs_state, batch_inputs_action, batch_outputs = [], [], []
-                for i, (state, action, reward, next_state) in enumerate(batch_replay):
+                for i, (state, action, reward, next_state, end) in enumerate(batch_replay):
                     batch_inputs_state.append(state)
                     batch_inputs_action.append([(0, 1, 0), (0, 0, 1), (1, 0, 0)][action])
-                    consider_future = 1 if state_processor.is_valid_norm(next_state) else 0
+                    consider_future = 0 if end else 1
                     batch_outputs.append([reward + consider_future * gamma * max(
-                        q_vals[3 * i][0], q_vals[3 * i + 1][0], q_vals[3 * i + 2][0])
-                    ])
+                        q_vals[3 * i][0], q_vals[3 * i + 1][0], q_vals[3 * i + 2][0]
+                    )])
 
                 # backpropagate
                 _, loss_value = session.run([optimizer, loss], feed_dict={
@@ -249,12 +263,30 @@ def main():
                 session.run(update_target_network)
 
             summary = tf.Summary()
-            summary.value.add(tag='loss', simple_value=np.mean(all_losses))
-            summary.value.add(tag='reward', simple_value=sum(all_rewards))
+            summary.value.add(tag='avg_loss', simple_value=np.mean(all_losses))
+            summary.value.add(tag='avg_reward', simple_value=np.mean(all_rewards))
+            summary.value.add(tag='sum_reward', simple_value=sum(all_rewards))
+            summary.value.add(tag='avg_q', simple_value=remove_nan(np.mean(all_qs), 0))
+            summary.value.add(tag='sum_q', simple_value=np.sum(all_qs))
             writer.add_summary(summary, global_step=episode)
-            print('Episode %d - L: %.3f\tAR: %.3f\tSR: %.3f' % (
-                episode, np.mean(all_losses), np.mean(all_rewards), sum(all_rewards))
-            )
+            print('Episode %d - L: %.3f\tAR: %.3f\tSR: %.3f\tAQ: %.3f\tSQ: %.3f' % (
+                episode, np.mean(all_losses), np.mean(all_rewards),
+                sum(all_rewards), np.mean(all_qs), np.sum(all_qs)
+            ))
+
+            if episode and not episode % save_network_every:
+                saver.save(session, './logs/updates', global_step=episode)
+                with open('./logs/last-episode.csv', 'w') as f:
+                    f.write('time;force;x;xdot;theta;thetadot\n')
+                    for i, (state, action) in enumerate(last_episode):
+                        f.write('%f;%f;%f;%f;%f;%d\n' % tuple(
+                            [i * pendulum.dt, action * force_factor] + state[-4:]
+                        ))
+                with open('./logs/last-replay-buffer.pckl', 'wb') as f:
+                    pickle.dump(replay_buffer, f)
+                with open('./logs/last-batch.pckl', 'wb') as f:
+                    pickle.dump((batch_inputs_state, batch_inputs_action, batch_outputs), f)
+                print('saved')
 
         writer.close()
 
