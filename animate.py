@@ -101,8 +101,9 @@ class Animate:
               help='Height of the animation (inches)')
 @click.option('--dpi', type=click.FLOAT, default=96.)
 @click.option('--blit/--no-blit', default=True)
-def main(input_run, rod_length, delta_t, gif_name, gif_fps, width, height, dpi, blit):
-    data = [p for p in csv.DictReader(input_run)]
+@click.option('--csv-delimiter', default=',')
+def main(input_run, rod_length, delta_t, gif_name, gif_fps, width, height, dpi, blit, csv_delimiter):
+    data = [p for p in csv.DictReader(input_run, delimiter=csv_delimiter)]
     anim = Animate(data, rod_length, delta_t, blit, dpi=dpi, tight_layout=True,
                    figsize=(width, height))
 
