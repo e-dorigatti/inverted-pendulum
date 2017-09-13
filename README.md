@@ -41,10 +41,12 @@ deep, in this case), that learns to balance the pendulum with bang-bang controls
 The hyperparameters are not set to the optimal values, because my poor laptop is,
 after all, only a laptop.
 
-The algorithm was introduced in:
+The algorithm was introduced [by deepmind](https://deepmind.com/research/dqn/) in:
 
 ```
-[Human-level control through deep reinforcement learning.](https://deepmind.com/research/dqn/)
-V. Mnih, K. Kavukcuoglu, D. Silver, A. Rusu, J. Veness, M. Bellemare, A. Graves, M. Riedmiller, A. Fidjeland, G. Ostrovski, S. Petersen, C. Beattie, A. Sadik, I. Antonoglou, H. King, D. Kumaran, D. Wierstra, S. Legg, and D. Hassabis. 
+Human-level control through deep reinforcement learning.
+V. Mnih, K. Kavukcuoglu, D. Silver, A. Rusu, J. Veness, M. Bellemare, A. Graves,
+M. Riedmiller, A. Fidjeland, G. Ostrovski, S. Petersen, C. Beattie, A. Sadik,
+I. Antonoglou, H. King, D. Kumaran, D. Wierstra, S. Legg, and D. Hassabis. 
 Nature 518 (7540): 529-533 (2015)
 ```
