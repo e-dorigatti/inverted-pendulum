@@ -235,27 +235,30 @@ class QNetwork:
 
 class DQNPendulum:
 
-    replay_batch_size = 32          # size of the minibatch for experience replay
-    simulation_length = 500         # how many steps each episode is
-    num_episodes = 100000           # stop training after this many episodes
-    replay_buffer_size = 1000000    # how many experiences to keep in the replay buffer
-    force_factor = 75               # force intensity for bang-bang control
-    epsilon_decay = 0.00025         # exploration rate coefficient
-    min_eps = 0.1                   # minimum random exploration rate
-    save_network_every = 25         # checkpoint interval (episodes)
-    past_states_count = 4           # input this many last states to the Q network
+    replay_batch_size = 32            # size of the minibatch for experience replay
+    simulation_length = 500           # how many steps each episode is
+    num_episodes = 100000             # stop training after this many episodes
+    replay_buffer_size = 1000000      # how many experiences to keep in the replay buffer
+    force_factor = 75                 # force intensity for bang-bang control
+    epsilon_decay = 0.00025           # exploration rate coefficient
+    min_eps = 0.1                     # minimum random exploration rate
+    save_network_every = 25           # checkpoint interval (episodes)
+    save_network_path = './logs/dqn'  # checkpoint location
+    past_states_count = 4             # input this many last states to the Q network
 
-    gamma = 0.99                    # Q-learning discount factor
-    tau = 0.001                     # soft update strength for target network
-    regularization_coeff = 0.001    # regularization in the loss
-    learning_rate = 0.001           # learning rate for the Q network
-    nnet_hidden_state_size = 128    # state is processed alone in this hidden layer
-    nnet_hidden_size = 128          # this layer combines state and action
+    gamma = 0.99                      # Q-learning discount factor
+    tau = 0.001                       # soft update strength for target network
+    regularization_coeff = 0.001      # regularization in the loss
+    learning_rate = 0.001             # learning rate for the Q network
+    nnet_hidden_state_size = 128      # state is processed alone in this hidden layer
+    nnet_hidden_size = 128            # this layer combines state and action
 
-    sim_field_length = 50           # episode fails if pendulum is outside [-l/2, l/2]
-    sim_max_speed = 100             # episode fails if the cart moves faster than this
-    sim_theta_max = 10              # episode fails if pendulum angle is more than this
-    sim_thetadot_max = 100          # episode fails if pendulum rotates faster than this
+    sim_field_length = 50             # episode fails if pendulum is outside [-l/2, l/2]
+    sim_max_speed = 100               # episode fails if the cart moves faster than this
+    sim_theta_max = 10                # episode fails if pendulum angle is more than this
+    sim_thetadot_max = 100            # episode fails if pendulum rotates faster than this
+
+    network_checkpoint = ''
 
     def learn(self):
         graph = tf.Graph()
@@ -263,9 +266,6 @@ class DQNPendulum:
                              self.learning_rate, self.nnet_hidden_state_size, self.nnet_hidden_size)
         with graph.as_default():
             self.qnet.build()
-
-        for f in os.listdir('logs'):
-            os.remove('logs/' + f)
 
         with tf.Session(graph=graph) as session:
             tf.global_variables_initializer().run()
@@ -275,6 +275,9 @@ class DQNPendulum:
             replay_buffer = KMostRecent(self.replay_buffer_size)
             state_processor = StatusProcessor(self.sim_field_length, self.sim_max_speed,
                                               self.sim_theta_max, self.sim_thetadot_max)
+
+            if self.network_checkpoint:
+                self.qnet.target_network_params = saver.restore(session, self.network_checkpoint)
 
             for episode in range(self.num_episodes):
                 stats = self.do_episode(session, episode, replay_buffer, state_processor)
@@ -340,7 +343,7 @@ class DQNPendulum:
         ))
 
         if episode_no and not episode_no % self.save_network_every:
-            saver.save(session, './logs/updates', global_step=episode_no)
+            saver.save(session, self.save_network_path, global_step=episode_no)
             with open('./logs/last-episode.csv', 'w') as f:
                 f.write('t,force,x,xdot,theta,thetadot\n')
                 for time, state, action in sim_trace:
