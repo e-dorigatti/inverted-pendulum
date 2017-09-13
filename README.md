@@ -33,3 +33,18 @@ find . -name '*.py' | xargs zip /tmp/genetic.zip
                                 --py-files /tmp/genetic.zip \
                                 spark_learn.py num_slices=24
 ```
+
+---
+
+The file `dqn.py` contains my implementation of the Deep Q Network (which is not
+deep, in this case), that learns to balance the pendulum with bang-bang controls.
+The hyperparameters are not set to the optimal values, because my poor laptop is,
+after all, only a laptop.
+
+The algorithm was introduced in:
+
+```
+[Human-level control through deep reinforcement learning.](https://deepmind.com/research/dqn/)
+V. Mnih, K. Kavukcuoglu, D. Silver, A. Rusu, J. Veness, M. Bellemare, A. Graves, M. Riedmiller, A. Fidjeland, G. Ostrovski, S. Petersen, C. Beattie, A. Sadik, I. Antonoglou, H. King, D. Kumaran, D. Wierstra, S. Legg, and D. Hassabis. 
+Nature 518 (7540): 529-533 (2015)
+```
